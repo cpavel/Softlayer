@@ -1,0 +1,138 @@
+# Firewall configuration written by system-config-firewall
+# Manual customization of this file is not recommended.
+*filter
+:INPUT ACCEPT [0:0]
+:FORWARD ACCEPT [0:0]
+:OUTPUT ACCEPT [0:0]
+
+#log everything that did not get through
+-N LOGIT
+-A LOGIT -m limit --limit 3/hour -j LOG --log-prefix "IPTables-Packet-Dropped: " --log-level 7
+-A LOGIT -j DROP
+
+#  Allows all loopback (lo0) traffic and drop all traffic to 127/8 that doesn't use lo0
+-A INPUT -i lo -j ACCEPT
+-A OUTPUT -o lo -j ACCEPT
+-A INPUT ! -i lo -d 127.0.0.0/8 -j LOGIT
+
+#  Allows all private backend (eth0) traffic a
+-A INPUT -i eth0 -j ACCEPT
+-A OUTPUT -o eth0 -j ACCEPT
+
+#syn flood protection
+-A INPUT -p tcp ! --syn -m state --state NEW -j LOGIT
+-A INPUT -f -j LOGIT
+-A INPUT -p tcp --tcp-flags ALL ALL -j LOGIT
+-A INPUT -p tcp --tcp-flags ALL NONE -j LOGIT
+
+# Allows range of ports other than ssh connections from anywhere (the normal ports for websites)
+-A INPUT -i eth1 -p tcp --dport 80 -j ACCEPT
+-A INPUT -i eth1 -p tcp --dport 443 -j ACCEPT
+
+#this line below is for FTP sessions, enable if needed
+#-A INPUT -i eth1 -p tcp -m tcp --dport 64000:64300 -j ACCEPT 
+-A INPUT -i eth1 -m state --state RELATED,ESTABLISHED -j ACCEPT  
+
+# but drop cn bots
+
+-I INPUT -s 210.0.0.0/8 -j LOGIT
+-I INPUT -s 211.0.0.0/8 -j LOGIT
+-I INPUT -s 219.0.0.0/8 -j LOGIT
+-I INPUT -s 220.0.0.0/8 -j LOGIT
+-I INPUT -s 221.0.0.0/8 -j LOGIT
+-I INPUT -s 222.176.0.0/8 -j LOGIT
+-I INPUT -s 116.16.0.0/8 -j LOGIT
+
+#  Allows SSH connections (only 5 attempts by an IP every 3 minutes, drop the rest)
+-A INPUT -i eth1 -p tcp --dport 22 -m state --state NEW -m recent --set
+-A INPUT -i eth1 -p tcp --dport 22 -m state --state NEW -m recent --update --seconds 180 --hitcount 5 -j LOGIT
+-A INPUT -i eth1 -p tcp -m state --state NEW,ESTABLISHED,RELATED --dport 22 -j ACCEPT
+-A OUTPUT -o eth1 -p tcp --sport 22 -m state --state ESTABLISHED,RELATED -j ACCEPT
+
+#  Allows 8080 connections for testing
+-A INPUT -i eth1 -p tcp -m state --state NEW,ESTABLISHED,RELATED --dport 8080 -j ACCEPT
+-A OUTPUT -o eth1 -p tcp --sport 8080 -m state --state ESTABLISHED,RELATED -j ACCEPT
+
+#  Allows 21 connections for testing
+#-A INPUT -i eth1 -p tcp -m state --state NEW,ESTABLISHED,RELATED --dport 21 -j ACCEPT
+#-A OUTPUT -o eth1 -p tcp --sport 21 -m state --state ESTABLISHED,RELATED -j ACCEPT
+
+#  Allows 3306 connections for testing
+#-A INPUT -i eth1 -p tcp -m state --state NEW,ESTABLISHED,RELATED --dport 3306 -j ACCEPT
+#-A OUTPUT -o eth1 -p tcp --sport 3306 -m state --state ESTABLISHED,RELATED -j ACCEPT
+
+#allow outgoing http and https
+-A OUTPUT -o eth1 -p tcp --sport 80 -m state --state ESTABLISHED -j ACCEPT
+-A OUTPUT -o eth1 -p tcp --sport 443 -m state --state ESTABLISHED -j ACCEPT
+
+#Allow outgoing http on public network
+-A OUTPUT -o eth1 -p tcp --dport 80 -m state --state NEW,ESTABLISHED -j ACCEPT
+-A INPUT -i eth1 -p tcp --sport 80 -m state --state ESTABLISHED -j ACCEPT
+
+#Allow outgoing https on public network
+-A OUTPUT -o eth1 -p tcp --dport 443 -m state --state NEW,ESTABLISHED -j ACCEPT
+-A INPUT -i eth1 -p tcp --sport 443 -m state --state ESTABLISHED -j ACCEPT
+
+#Allow outgoing DNS on public network
+-A OUTPUT -o eth1 -p udp --dport 53 -m state --state NEW,ESTABLISHED -j ACCEPT
+-A INPUT -i eth1 -p udp --sport 53 -m state --state ESTABLISHED -j ACCEPT
+
+#Allow outgoing SendGrid on public network
+-A OUTPUT -o eth1 -p tcp --dport 587 -m state --state NEW,ESTABLISHED -j ACCEPT
+-A INPUT -i eth1 -p tcp --sport 587 -m state --state ESTABLISHED -j ACCEPT
+
+#Allow outgoing NTP on public network
+-A OUTPUT -o eth1 -p udp --dport 123 -m state --state NEW,ESTABLISHED -j ACCEPT
+-A INPUT -i eth1 -p udp --sport 123 -m state --state ESTABLISHED -j ACCEPT
+
+#Allow to ping outside world
+-A OUTPUT -o eth1 -p icmp --icmp-type echo-request -j ACCEPT
+-A INPUT -i eth1 -p icmp --icmp-type echo-reply -j ACCEPT
+
+#Allow TOR Softlayer integration services IN/OUT
+-A OUTPUT -o eth1 -p udp -d 158.85.118.0/23 -j ACCEPT
+-A INPUT -i eth1 -p udp -s 158.85.118.0/23 -j ACCEPT
+-A OUTPUT -o eth1 -p tcp -d 158.85.118.0/23 -j ACCEPT
+-A INPUT -i eth1 -p tcp -s 158.85.118.0/23 -j ACCEPT
+-A INPUT -i eth1 -p icmp -s 158.85.118.0/23 -j ACCEPT
+-A OUTPUT -o eth1 -p icmp -d 158.85.118.0/23 -j ACCEPT
+
+-A OUTPUT -o eth1 -p udp -d 158.85.116.0/24 -j ACCEPT
+-A INPUT -i eth1 -p udp -s 158.85.116.0/24 -j ACCEPT
+-A OUTPUT -o eth1 -p tcp -d 158.85.116.0/24 -j ACCEPT
+-A INPUT -i eth1 -p tcp -s 158.85.116.0/24 -j ACCEPT
+-A INPUT -i eth1 -p icmp -s 158.85.116.0/24 -j ACCEPT
+-A OUTPUT -o eth1 -p icmp -d 158.85.116.0/24 -j ACCEPT
+
+#Allow MON Softlayer integration services
+-A OUTPUT -o eth1 -p udp -d 169.54.118.0/23 -j ACCEPT
+-A INPUT -i eth1 -p udp -s 169.54.118.0/23 -j ACCEPT
+-A OUTPUT -o eth1 -p tcp -d 169.54.118.0/23 -j ACCEPT
+-A INPUT -i eth1 -p tcp -s 169.54.118.0/23 -j ACCEPT
+-A OUTPUT -o eth1 -p icmp -d 169.54.118.0/23 -j ACCEPT
+-A INPUT -i eth1 -p icmp -s 169.54.118.0/23 -j ACCEPT
+
+-A OUTPUT -o eth1 -p udp -d 169.54.116.0/24 -j ACCEPT
+-A INPUT -i eth1 -p udp -s 169.54.116.0/24 -j ACCEPT
+-A OUTPUT -o eth1 -p tcp -d 169.54.116.0/24 -j ACCEPT
+-A INPUT -i eth1 -p tcp -s 169.54.116.0/24 -j ACCEPT
+-A OUTPUT -o eth1 -p icmp -d 169.54.116.0/24 -j ACCEPT
+-A INPUT -i eth1 -p icmp -s 169.54.116.0/24 -j ACCEPT
+
+#allow vulnerability scanner
+-A OUTPUT -o eth1 -p udp -d 173.192.255.232/32 -j ACCEPT
+-A INPUT -i eth1 -p udp -s 173.192.255.232/32 -j ACCEPT
+-A OUTPUT -o eth1 -p tcp -d 173.192.255.232/32 -j ACCEPT
+-A INPUT -i eth1 -p tcp -s 173.192.255.232/32 -j ACCEPT
+-A OUTPUT -o eth1 -p icmp -d 173.192.255.232/32 -j ACCEPT
+-A INPUT -i eth1 -p icmp -s 173.192.255.232/32 -j ACCEPT
+
+# Reject all other inbound/outbound/forward - default deny unless explicitly allowed policy
+-A INPUT -j LOGIT
+-A OUTPUT -j LOGIT
+-A FORWARD -j LOGIT
+
+-A INPUT -j REJECT --reject-with icmp-host-prohibited 
+-A FORWARD -j REJECT --reject-with icmp-host-prohibited
+
+COMMIT
