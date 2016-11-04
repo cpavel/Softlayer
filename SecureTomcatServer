@@ -1,0 +1,67 @@
+#this is for CentOS 6.8
+#1. Update system
+yum update
+
+#2. Load IP tables config file to /etc/sysconfig/iptables - note that eth0 is private network and eth1 is public (to be disabled). Start iptables and add to autostart
+service iptables start
+chkconfig iptables on
+
+#3. Add user username sys-admin password YourPassword and allow sudo: 
+adduser sys-admin
+passwd sys-admin 
+usermod -aG wheel sys-admin
+visudo
+#uncomment #wheel ALl=(ALL)	ALL
+
+#4. Java install
+cd /opt
+wget --no-cookies --no-check-certificate --header "Cookie: gpw_e24=http%3A%2F%2Fwww.oracle.com%2F; oraclelicense=accept-securebackup-cookie" "http://download.oracle.com/otn-pub/java/jdk/8u101-b13/jdk-8u101-linux-x64.tar.gz"
+tar xzf jdk-8u101-linux-x64.tar.gz"
+cd jdk1.8.0_101/
+alternatives --install /usr/bin/java java /opt/jdk1.8.0_101/bin/java 2
+alternatives --config java
+alternatives --install /usr/bin/jar jar /opt/jdk1.8.0_101/bin/jar 2
+alternatives --install /usr/bin/javac javac /opt/jdk1.8.0_101/bin/javac 2
+alternatives --set jar /opt/jdk1.8.0_101/bin/jar
+alternatives --set javac /opt/jdk1.8.0_101/bin/javac
+
+#5. Create environment variables
+vi /etc/profile.d/custom.sh
+export JAVA_HOME=/opt/jdk1.8.0_101
+export JRE_HOME=/opt/jdk1.8.0_101/jre
+export PATH=$PATH:/opt/jdk1.8.0_101/bin:/opt/jdk1.8.0_101/jre/bin
+
+#6. Set time zone to EST replace with America/New_York
+mv /etc/localtime /etc/localtime.bak
+ln -s /usr/share/zoneinfo/America/New_York /etc/localtime
+
+#7. install NTPD
+yum install ntp
+service ntpd start
+chkconfig ntpd on
+date
+
+#8. Install Tomcat 8.5.6
+cd /tmp
+wget http://httpd-mirror.frgl.pw/apache/tomcat/tomcat-8/v8.5.6/bin/apache-tomcat-8.5.6.tar.gz
+tar xzf apache-tomcat-8.5.6.tar.gz
+mv apache-tomcat-8.5.6 /usr/local/tomcat8
+cd /usr/local/tomcat8/
+./bin/startup.sh
+
+#9. Create Tomcat user sys-admin password and sys-manager password edit vi /usr/local/tomcat8/conf/tomcat-users.xml and paste inside <tomcat-users> </tomcat-users>
+#<!-- user manager can access only manager section -->
+#<role rolename="manager-gui" />
+#<user username="sys-manager" password="!!!!!!" roles="manager-gui" />
+
+#<!-- user admin can access manager and admin section both -->
+#<role rolename="admin-gui" />
+#<user username="sys-admin" password="!!!!!!" roles="manager-gui,admin-gui" />
+
+#10. Edit /usr/local/tomcat8/webapps/manager/META-INF/context.xml and /usr/local/tomcat8/webapps/host-manager/META-INF/context.xml
+#insert replace the following to allow manager app access from VPN (10/8 or use another IP range)
+
+#<Context antiResourceLocking="false" privileged="true" >
+#  <Valve className="org.apache.catalina.valves.RemoteAddrValve"
+#         allow="10\.\d+\.\d+\.\d+|::1|0:0:0:0:0:0:0:1" />
+#</Context>
